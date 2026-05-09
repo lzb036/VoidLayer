@@ -28,6 +28,7 @@ private:
     NOTIFYICONDATAW trayIcon_ = {};
     bool trayCreated_ = false;
     bool reapplyPaused_ = false;
+    bool fastReapplyTimerActive_ = false;
 
     AppSettings settings_;
     RuleStore store_;
@@ -48,6 +49,8 @@ private:
     void ShowTrayMenu();
     void ShowBalloon(const std::wstring& title, const std::wstring& message, DWORD icon = NIIF_INFO);
     void UpdateTrayTip(const std::wstring& suffix = L"");
+    void EnsureFastReapplyTimer();
+    void StopFastReapplyTimer();
 
     void OpenSettings();
     void ShowHelp();

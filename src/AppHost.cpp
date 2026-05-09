@@ -114,7 +114,9 @@ bool AppHost::Initialize(HINSTANCE instance) {
 void AppHost::Shutdown() {
     if (hwnd_ != nullptr) {
         KillTimer(hwnd_, TIMER_REAPPLY);
+        KillTimer(hwnd_, TIMER_REAPPLY_FAST);
     }
+    fastReapplyTimerActive_ = false;
 
     hotkeys_.UnregisterAll(hwnd_);
     reapply_.Stop();
@@ -161,12 +163,21 @@ LRESULT AppHost::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             if (settingsDialog_ != nullptr && settingsDialog_->IsOpen()) {
                 settingsDialog_->SetActiveTargetCount(reapply_.ActiveTargetCount());
             }
+        } else if (wParam == TIMER_REAPPLY_FAST && !reapplyPaused_) {
+            if (reapply_.ShouldUseInteractiveGuard()) {
+                reapply_.ReconcileStickyTargets(true);
+            } else {
+                StopFastReapplyTimer();
+            }
         }
         return 0;
 
     case WM_VOIDLAYER_REAPPLY_EVENT:
         if (!reapplyPaused_) {
             reapply_.OnWinEvent();
+            if (reapply_.ShouldUseInteractiveGuard()) {
+                EnsureFastReapplyTimer();
+            }
         }
         return 0;
 
@@ -312,6 +323,24 @@ void AppHost::UpdateTrayTip(const std::wstring& suffix) {
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
 }
 
+void AppHost::EnsureFastReapplyTimer() {
+    if (hwnd_ == nullptr || fastReapplyTimerActive_ || reapplyPaused_) {
+        return;
+    }
+
+    SetTimer(hwnd_, TIMER_REAPPLY_FAST, REAPPLY_FAST_INTERVAL_MS, nullptr);
+    fastReapplyTimerActive_ = true;
+}
+
+void AppHost::StopFastReapplyTimer() {
+    if (hwnd_ == nullptr || !fastReapplyTimerActive_) {
+        return;
+    }
+
+    KillTimer(hwnd_, TIMER_REAPPLY_FAST);
+    fastReapplyTimerActive_ = false;
+}
+
 void AppHost::OpenSettings() {
     if (settingsDialog_ == nullptr) {
         settingsDialog_ = std::make_unique<SettingsDialog>(instance_, hwnd_, settings_, store_);
@@ -349,12 +378,16 @@ void AppHost::ToggleReapplyPause() {
     reapplyPaused_ = !reapplyPaused_;
     if (reapplyPaused_) {
         KillTimer(hwnd_, TIMER_REAPPLY);
+        StopFastReapplyTimer();
         reapply_.Stop();
         ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::CompatibilityPaused));
     } else {
         reapply_.Start(hwnd_);
         SetTimer(hwnd_, TIMER_REAPPLY, REAPPLY_INTERVAL_MS, nullptr);
         reapply_.ReconcileStickyTargets(true);
+        if (reapply_.ShouldUseInteractiveGuard()) {
+            EnsureFastReapplyTimer();
+        }
         ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::CompatibilityResumed));
     }
 }
@@ -403,10 +436,15 @@ void AppHost::AdjustForegroundOpacity(int direction) {
         result = transparency_.RestoreOpacity(*identity);
         reapply_.RemoveSessionTarget(identity->hwnd);
         reapply_.RemovePersistentRule(*identity);
+        if (!reapply_.HasTrackedTargets()) {
+            StopFastReapplyTimer();
+        }
     } else {
         result = transparency_.ApplyOpacity(*identity, nextAlpha);
         if (result) {
             reapply_.AddOrUpdateSessionTarget(*identity, nextAlpha, true);
+            reapply_.BoostInteractiveGuard();
+            EnsureFastReapplyTimer();
             reapply_.UpdatePersistentRuleAlpha(*identity, nextAlpha);
             UpdateTrayTip(T(settings_.language, TextId::TrayTipCurrent) + PercentTextFromAlpha(nextAlpha));
         }
@@ -426,6 +464,9 @@ void AppHost::RestoreForegroundOpacity() {
     const ApplyResult result = transparency_.RestoreOpacity(*identity);
     reapply_.RemoveSessionTarget(identity->hwnd);
     const bool unpinned = reapply_.RemovePersistentRule(*identity);
+    if (!reapply_.HasTrackedTargets()) {
+        StopFastReapplyTimer();
+    }
 
     if (!result) {
         NotifyApplyFailure(result);
@@ -446,6 +487,10 @@ void AppHost::TogglePinForForeground() {
     const bool pinned = reapply_.TogglePersistentRule(*identity, alpha);
     if (pinned && alpha < 255) {
         reapply_.AddOrUpdateSessionTarget(*identity, alpha, true);
+        reapply_.BoostInteractiveGuard();
+        EnsureFastReapplyTimer();
+    } else if (!reapply_.HasTrackedTargets()) {
+        StopFastReapplyTimer();
     }
 
     ShowBalloon(T(settings_.language, TextId::AppTitle), pinned ? T(settings_.language, TextId::RulePinned) : T(settings_.language, TextId::RuleRemoved));

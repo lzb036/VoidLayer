@@ -15,6 +15,10 @@ bool IsInterestingEvent(DWORD event) {
            event == EVENT_OBJECT_NAMECHANGE;
 }
 
+bool TickStillActive(DWORD untilTick) {
+    return static_cast<LONG>(untilTick - GetTickCount()) > 0;
+}
+
 void InstallHook(std::vector<HWINEVENTHOOK>& hooks, DWORD event) {
     HWINEVENTHOOK hook = SetWinEventHook(
         event,
@@ -73,6 +77,9 @@ void ReapplyService::Stop() {
 }
 
 void ReapplyService::OnWinEvent() {
+    if (HasTrackedTargets()) {
+        BoostInteractiveGuard(1200);
+    }
     ReconcileStickyTargets(false);
 }
 
@@ -89,6 +96,17 @@ void ReapplyService::ReconcileStickyTargets(bool force) {
 
     ReconcileSessionTargets();
     ReconcilePersistentRules();
+}
+
+void ReapplyService::BoostInteractiveGuard(DWORD durationMs) {
+    if (!HasTrackedTargets()) {
+        return;
+    }
+    interactiveGuardUntil_ = GetTickCount() + durationMs;
+}
+
+bool ReapplyService::ShouldUseInteractiveGuard() const {
+    return HasTrackedTargets() && (TickStillActive(interactiveGuardUntil_) || IsTrackedWindowInteractive());
 }
 
 void ReapplyService::AddOrUpdateSessionTarget(const WindowIdentity& identity, uint8_t alpha, bool sticky) {
@@ -183,6 +201,19 @@ size_t ReapplyService::ActiveTargetCount() const {
     return sessionTargets_.size() + rules_.size();
 }
 
+bool ReapplyService::HasTrackedTargets() const {
+    const bool hasSessionTargets = std::any_of(sessionTargets_.begin(), sessionTargets_.end(), [](const OpacityTarget& target) {
+        return target.sticky && target.alpha < 255;
+    });
+    if (hasSessionTargets) {
+        return true;
+    }
+
+    return std::any_of(rules_.begin(), rules_.end(), [](const OpacityRule& rule) {
+        return rule.enabled && rule.alpha < 255;
+    });
+}
+
 void ReapplyService::ReconcileSessionTargets() {
     for (auto& target : sessionTargets_) {
         if (!target.sticky || target.alpha >= 255) {
@@ -215,11 +246,54 @@ void ReapplyService::ReconcilePersistentRules() {
         }
 
         for (const auto& window : windows) {
-            if (resolver_.MatchesRule(window, rule) && transparency_.NeedsReapply(window.hwnd, rule.alpha)) {
-                transparency_.ApplyOpacity(window, rule.alpha);
+            if (resolver_.MatchesRule(window, rule)) {
+                AddOrUpdateSessionTarget(window, rule.alpha, true);
+                if (transparency_.NeedsReapply(window.hwnd, rule.alpha)) {
+                    transparency_.ApplyOpacity(window, rule.alpha);
+                }
             }
         }
     }
+}
+
+bool ReapplyService::IsTrackedWindowInteractive() const {
+    for (const auto& target : sessionTargets_) {
+        if (target.sticky && target.alpha < 255 && IsWindowInteractive(target.identity.hwnd)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ReapplyService::IsWindowInteractive(HWND hwnd) const {
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return false;
+    }
+
+    HWND foreground = GetForegroundWindow();
+    if (foreground == hwnd ||
+        GetAncestor(foreground, GA_ROOT) == hwnd ||
+        GetAncestor(foreground, GA_ROOTOWNER) == hwnd ||
+        IsChild(hwnd, foreground)) {
+        return true;
+    }
+
+    POINT cursor = {};
+    if (!GetCursorPos(&cursor)) {
+        return false;
+    }
+
+    RECT rect = {};
+    if (GetWindowRect(hwnd, &rect) && PtInRect(&rect, cursor)) {
+        return true;
+    }
+
+    HWND underCursor = WindowFromPoint(cursor);
+    return underCursor == hwnd ||
+           GetAncestor(underCursor, GA_ROOT) == hwnd ||
+           GetAncestor(underCursor, GA_ROOTOWNER) == hwnd ||
+           IsChild(hwnd, underCursor);
 }
 
 bool ReapplyService::MatchesTarget(const OpacityTarget& target, const WindowIdentity& identity) const {
