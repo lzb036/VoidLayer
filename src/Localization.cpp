@@ -19,7 +19,7 @@ std::wstring T(AppLanguage language, TextId id) {
     case TextId::StartupBalloon:
         return zh ? L"已在系统托盘运行。使用 Alt+左/右 调整透明度。" : L"Running in the system tray. Use Alt+Left/Right to adjust opacity.";
     case TextId::TrayTip:
-        return zh ? L"VoidLayer - 窗口透明度控制" : L"VoidLayer - opacity control";
+        return L"VoidLayer";
     case TextId::TrayTipCurrent:
         return zh ? L"当前 " : L"current ";
     case TextId::TrayTipRestored:

@@ -1,3 +1,35 @@
 #include "resource.h"
 
 IDI_VOIDLAYER_APP ICON "..\\assets\\app-icon.ico"
+
+1 VERSIONINFO
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "VoidLayer\0"
+            VALUE "FileDescription", "VoidLayer\0"
+            VALUE "FileVersion", "0.1.0\0"
+            VALUE "InternalName", "VoidLayer\0"
+            VALUE "OriginalFilename", "VoidLayer.exe\0"
+            VALUE "ProductName", "VoidLayer\0"
+            VALUE "ProductVersion", "0.1.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END
