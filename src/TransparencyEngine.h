@@ -27,7 +27,7 @@ private:
 
     ApplyResult EnsureLayered(HWND hwnd);
     ApplyResult SetAlpha(HWND hwnd, uint8_t alpha);
-    ApplyResult SetExStyle(HWND hwnd, LONG_PTR exStyle);
+    ApplyResult SetExStyle(HWND hwnd, LONG_PTR exStyle, bool refreshFrame = true);
     std::optional<LONG_PTR> GetExStyle(HWND hwnd, DWORD* errorCode = nullptr) const;
     void CaptureOriginalState(HWND hwnd);
     ApplyResult MakeResultFromLastError(ApplyStatus fallbackStatus, const wchar_t* context) const;

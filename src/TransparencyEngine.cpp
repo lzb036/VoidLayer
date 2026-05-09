@@ -145,7 +145,7 @@ ApplyResult TransparencyEngine::EnsureLayered(HWND hwnd) {
         return {};
     }
 
-    return SetExStyle(hwnd, *currentExStyle | WS_EX_LAYERED);
+    return SetExStyle(hwnd, *currentExStyle | WS_EX_LAYERED, false);
 }
 
 ApplyResult TransparencyEngine::SetAlpha(HWND hwnd, uint8_t alpha) {
@@ -154,11 +154,10 @@ ApplyResult TransparencyEngine::SetAlpha(HWND hwnd, uint8_t alpha) {
         return MakeResultFromLastError(ApplyStatus::Failed, L"Unable to set opacity.");
     }
 
-    RefreshWindowFrame(hwnd);
     return {};
 }
 
-ApplyResult TransparencyEngine::SetExStyle(HWND hwnd, LONG_PTR exStyle) {
+ApplyResult TransparencyEngine::SetExStyle(HWND hwnd, LONG_PTR exStyle, bool refreshFrame) {
     SetLastError(ERROR_SUCCESS);
     const LONG_PTR previous = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, exStyle);
     const DWORD errorCode = GetLastError();
@@ -170,7 +169,9 @@ ApplyResult TransparencyEngine::SetExStyle(HWND hwnd, LONG_PTR exStyle) {
         return result;
     }
 
-    RefreshWindowFrame(hwnd);
+    if (refreshFrame) {
+        RefreshWindowFrame(hwnd);
+    }
     return {};
 }
 
