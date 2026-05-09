@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 
 #include "Localization.h"
+#include "resource.h"
 
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -57,6 +58,12 @@ void SetExplorerTheme(HWND hwnd) {
     if (hwnd != nullptr) {
         SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);
     }
+}
+
+HICON LoadVoidLayerIcon(HINSTANCE instance, int width, int height) {
+    HICON icon = static_cast<HICON>(
+        LoadImageW(instance, MAKEINTRESOURCEW(IDI_VOIDLAYER_APP), IMAGE_ICON, width, height, LR_SHARED));
+    return icon != nullptr ? icon : LoadIconW(nullptr, IDI_APPLICATION);
 }
 
 }  // namespace
@@ -235,8 +242,8 @@ void SettingsDialog::RegisterClassIfNeeded() {
     wc.lpszClassName = kSettingsClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = canvasBrush_;
-    wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-    wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+    wc.hIcon = LoadVoidLayerIcon(instance_, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    wc.hIconSm = LoadVoidLayerIcon(instance_, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     RegisterClassExW(&wc);
 }
 

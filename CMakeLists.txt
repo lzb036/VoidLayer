@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(VoidLayer VERSION 0.1.0 LANGUAGES CXX)
+project(VoidLayer VERSION 0.1.0 LANGUAGES CXX RC)
 
 add_executable(VoidLayer WIN32
+    src/VoidLayer.rc
     src/AppHost.cpp
     src/HotkeyManager.cpp
     src/Localization.cpp

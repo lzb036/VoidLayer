@@ -1,6 +1,7 @@
 #include "AppHost.h"
 
 #include "Localization.h"
+#include "resource.h"
 
 #include <commctrl.h>
 #include <shellapi.h>
@@ -26,6 +27,12 @@ std::wstring PercentTextFromAlpha(uint8_t alpha) {
 
 int StepAlphaFromPercent(int percent) {
     return std::max(1, static_cast<int>(PercentToAlpha(percent)));
+}
+
+HICON LoadVoidLayerIcon(HINSTANCE instance, int width, int height) {
+    HICON icon = static_cast<HICON>(
+        LoadImageW(instance, MAKEINTRESOURCEW(IDI_VOIDLAYER_APP), IMAGE_ICON, width, height, LR_SHARED));
+    return icon != nullptr ? icon : LoadIconW(nullptr, IDI_APPLICATION);
 }
 
 }  // namespace
@@ -243,8 +250,8 @@ void AppHost::RegisterWindowClass() {
     wc.hInstance = instance_;
     wc.lpszClassName = kHostClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-    wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+    wc.hIcon = LoadVoidLayerIcon(instance_, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    wc.hIconSm = LoadVoidLayerIcon(instance_, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     RegisterClassExW(&wc);
 }
 
@@ -255,7 +262,7 @@ void AppHost::CreateTrayIcon() {
     trayIcon_.uID = kTrayIconId;
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     trayIcon_.uCallbackMessage = WM_VOIDLAYER_TRAY;
-    trayIcon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    trayIcon_.hIcon = LoadVoidLayerIcon(instance_, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     wcscpy_s(trayIcon_.szTip, T(settings_.language, TextId::TrayTip).c_str());
 
     trayCreated_ = Shell_NotifyIconW(NIM_ADD, &trayIcon_) != FALSE;

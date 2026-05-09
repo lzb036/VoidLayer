@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_VOIDLAYER_APP ICON "..\\assets\\app-icon.ico"
