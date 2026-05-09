@@ -1,5 +1,7 @@
 #include "HotkeyManager.h"
 
+#include "Localization.h"
+
 namespace voidlayer {
 
 void HotkeyManager::Configure(const AppSettings& settings) {
@@ -10,10 +12,10 @@ bool HotkeyManager::RegisterAll(HWND hwnd, std::vector<std::wstring>* failures) 
     UnregisterAll(hwnd);
 
     bool ok = true;
-    ok = RegisterOne(hwnd, ID_DECREASE, settings_.decreaseOpacity, L"Decrease opacity", failures) && ok;
-    ok = RegisterOne(hwnd, ID_INCREASE, settings_.increaseOpacity, L"Increase opacity", failures) && ok;
-    ok = RegisterOne(hwnd, ID_RESTORE, settings_.restoreOpacity, L"Restore opacity", failures) && ok;
-    ok = RegisterOne(hwnd, ID_TOGGLE_PIN, settings_.togglePin, L"Pin rule", failures) && ok;
+    ok = RegisterOne(hwnd, ID_DECREASE, settings_.decreaseOpacity, T(settings_.language, TextId::HotkeyDecrease).c_str(), failures) && ok;
+    ok = RegisterOne(hwnd, ID_INCREASE, settings_.increaseOpacity, T(settings_.language, TextId::HotkeyIncrease).c_str(), failures) && ok;
+    ok = RegisterOne(hwnd, ID_RESTORE, settings_.restoreOpacity, T(settings_.language, TextId::HotkeyRestore).c_str(), failures) && ok;
+    ok = RegisterOne(hwnd, ID_TOGGLE_PIN, settings_.togglePin, T(settings_.language, TextId::HotkeyPin).c_str(), failures) && ok;
     return ok;
 }
 
@@ -64,7 +66,7 @@ bool HotkeyManager::RegisterOne(
 
     if (failures != nullptr) {
         std::wstring message = label;
-        message += L" hotkey could not be registered.";
+        message += T(settings_.language, TextId::HotkeyRegisterFailed);
         const DWORD errorCode = GetLastError();
         const std::wstring details = FormatWin32Error(errorCode);
         if (!details.empty()) {

@@ -8,6 +8,8 @@ VoidLayer is a lightweight Windows-only tray utility for adjusting and keeping w
 - Control the foreground window with global hotkeys.
 - Keep opacity applied for windows that reset their layered style, especially MuMu emulator windows.
 - Store pinned opacity rules in `%APPDATA%\VoidLayer\settings.ini`.
+- Switch the interface between English and Simplified Chinese.
+- Show built-in usage help from the tray menu.
 
 ## Default Hotkeys
 
@@ -34,3 +36,5 @@ build\Release\VoidLayer.exe
 - First release targets Windows 10/11 x64.
 - Run as administrator if you need to control elevated windows.
 - The app is tray-first. Right-click the tray icon for settings and exit.
+- Change language from the settings window. The choice is saved in the INI config.
+- Open Help from the tray menu to see the default hotkeys and emulator compatibility notes.

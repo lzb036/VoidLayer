@@ -5,6 +5,7 @@ project(VoidLayer VERSION 0.1.0 LANGUAGES CXX)
 add_executable(VoidLayer WIN32
     src/AppHost.cpp
     src/HotkeyManager.cpp
+    src/Localization.cpp
     src/ReapplyService.cpp
     src/RuleStore.cpp
     src/SettingsDialog.cpp

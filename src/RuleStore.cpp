@@ -1,5 +1,7 @@
 #include "RuleStore.h"
 
+#include "Localization.h"
+
 #include <shlobj.h>
 
 #include <algorithm>
@@ -83,6 +85,7 @@ AppSettings RuleStore::LoadSettings() const {
     settings.opacityStepPercent = ClampPercent(ReadInt(L"Settings", L"OpacityStepPercent", settings.opacityStepPercent), 1, 50);
     settings.minOpacityPercent = ClampPercent(ReadInt(L"Settings", L"MinOpacityPercent", settings.minOpacityPercent), 5, 95);
     settings.strongCompatibility = ReadInt(L"Settings", L"StrongCompatibility", settings.strongCompatibility ? 1 : 0) != 0;
+    settings.language = LanguageFromInt(ReadInt(L"Settings", L"Language", LanguageToInt(settings.language)));
 
     settings.decreaseOpacity = LoadHotkey(*this, L"DecreaseOpacity", settings.decreaseOpacity);
     settings.increaseOpacity = LoadHotkey(*this, L"IncreaseOpacity", settings.increaseOpacity);
@@ -95,6 +98,7 @@ void RuleStore::SaveSettings(const AppSettings& settings) const {
     WriteInt(L"Settings", L"OpacityStepPercent", ClampPercent(settings.opacityStepPercent, 1, 50));
     WriteInt(L"Settings", L"MinOpacityPercent", ClampPercent(settings.minOpacityPercent, 5, 95));
     WriteInt(L"Settings", L"StrongCompatibility", settings.strongCompatibility ? 1 : 0);
+    WriteInt(L"Settings", L"Language", LanguageToInt(settings.language));
 
     SaveHotkey(*this, L"DecreaseOpacity", settings.decreaseOpacity);
     SaveHotkey(*this, L"IncreaseOpacity", settings.increaseOpacity);

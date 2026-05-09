@@ -35,10 +35,17 @@ private:
 
     HWND stepTrack_ = nullptr;
     HWND minTrack_ = nullptr;
+    HWND titleLabel_ = nullptr;
+    HWND subtitleLabel_ = nullptr;
+    HWND languageLabel_ = nullptr;
+    HWND languageCombo_ = nullptr;
     HWND stepLabel_ = nullptr;
     HWND minLabel_ = nullptr;
     HWND strongCheck_ = nullptr;
     HWND statusLabel_ = nullptr;
+    HWND openButton_ = nullptr;
+    HWND saveButton_ = nullptr;
+    HWND closeButton_ = nullptr;
 
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);

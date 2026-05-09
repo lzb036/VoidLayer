@@ -1,5 +1,7 @@
 #include "AppHost.h"
 
+#include "Localization.h"
+
 #include <commctrl.h>
 #include <shellapi.h>
 
@@ -15,7 +17,8 @@ constexpr UINT IDM_SETTINGS = 5101;
 constexpr UINT IDM_RESTORE = 5102;
 constexpr UINT IDM_PAUSE = 5103;
 constexpr UINT IDM_OPEN_CONFIG = 5104;
-constexpr UINT IDM_EXIT = 5105;
+constexpr UINT IDM_HELP = 5105;
+constexpr UINT IDM_EXIT = 5106;
 
 std::wstring PercentTextFromAlpha(uint8_t alpha) {
     return std::to_wstring(AlphaToPercent(alpha)) + L"%";
@@ -52,12 +55,13 @@ bool AppHost::Initialize(HINSTANCE instance) {
 
     mutex_ = CreateMutexW(nullptr, TRUE, L"Local\\VoidLayer.SingleInstance");
     if (mutex_ == nullptr) {
-        MessageBoxW(nullptr, L"Unable to create single-instance lock.", L"VoidLayer", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, T(settings_.language, TextId::MutexError).c_str(), T(settings_.language, TextId::AppTitle).c_str(), MB_OK | MB_ICONERROR);
         return false;
     }
 
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        MessageBoxW(nullptr, L"VoidLayer is already running.", L"VoidLayer", MB_OK | MB_ICONINFORMATION);
+        settings_ = store_.LoadSettings();
+        MessageBoxW(nullptr, T(settings_.language, TextId::AlreadyRunning).c_str(), T(settings_.language, TextId::AppTitle).c_str(), MB_OK | MB_ICONINFORMATION);
         return false;
     }
 
@@ -75,7 +79,7 @@ bool AppHost::Initialize(HINSTANCE instance) {
     hwnd_ = CreateWindowExW(
         0,
         kHostClassName,
-        L"VoidLayer",
+        T(settings_.language, TextId::AppTitle).c_str(),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -87,7 +91,7 @@ bool AppHost::Initialize(HINSTANCE instance) {
         this);
 
     if (hwnd_ == nullptr) {
-        MessageBoxW(nullptr, L"Unable to create host window.", L"VoidLayer", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, T(settings_.language, TextId::HostCreateError).c_str(), T(settings_.language, TextId::AppTitle).c_str(), MB_OK | MB_ICONERROR);
         return false;
     }
 
@@ -96,14 +100,14 @@ bool AppHost::Initialize(HINSTANCE instance) {
 
     std::vector<std::wstring> hotkeyFailures;
     if (!hotkeys_.RegisterAll(hwnd_, &hotkeyFailures) && !hotkeyFailures.empty()) {
-        ShowBalloon(L"Hotkey conflict", hotkeyFailures.front(), NIIF_WARNING);
+        ShowBalloon(T(settings_.language, TextId::HotkeyConflictTitle), hotkeyFailures.front(), NIIF_WARNING);
     }
 
     reapply_.Start(hwnd_);
     SetTimer(hwnd_, TIMER_REAPPLY, REAPPLY_INTERVAL_MS, nullptr);
     reapply_.ReconcileStickyTargets(true);
 
-    ShowBalloon(L"VoidLayer", L"Running in the system tray. Use Alt+Left/Right to adjust opacity.");
+    ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::StartupBalloon));
     return true;
 }
 
@@ -195,6 +199,9 @@ LRESULT AppHost::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         case IDM_OPEN_CONFIG:
             ShellExecuteW(hwnd_, L"open", store_.ConfigDirectory().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             return 0;
+        case IDM_HELP:
+            ShowHelp();
+            return 0;
         case IDM_EXIT:
             Exit();
             return 0;
@@ -238,7 +245,7 @@ void AppHost::CreateTrayIcon() {
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     trayIcon_.uCallbackMessage = WM_VOIDLAYER_TRAY;
     trayIcon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-    wcscpy_s(trayIcon_.szTip, L"VoidLayer - opacity control");
+    wcscpy_s(trayIcon_.szTip, T(settings_.language, TextId::TrayTip).c_str());
 
     trayCreated_ = Shell_NotifyIconW(NIM_ADD, &trayIcon_) != FALSE;
     if (trayCreated_) {
@@ -260,12 +267,13 @@ void AppHost::ShowTrayMenu() {
         return;
     }
 
-    AppendMenuW(menu, MF_STRING, IDM_SETTINGS, L"Settings");
-    AppendMenuW(menu, MF_STRING, IDM_RESTORE, L"Restore current window");
-    AppendMenuW(menu, MF_STRING, IDM_PAUSE, reapplyPaused_ ? L"Resume strong compatibility" : L"Pause strong compatibility");
-    AppendMenuW(menu, MF_STRING, IDM_OPEN_CONFIG, L"Open config folder");
+    AppendMenuW(menu, MF_STRING, IDM_SETTINGS, T(settings_.language, TextId::MenuSettings).c_str());
+    AppendMenuW(menu, MF_STRING, IDM_RESTORE, T(settings_.language, TextId::MenuRestore).c_str());
+    AppendMenuW(menu, MF_STRING, IDM_PAUSE, T(settings_.language, reapplyPaused_ ? TextId::MenuResumeCompatibility : TextId::MenuPauseCompatibility).c_str());
+    AppendMenuW(menu, MF_STRING, IDM_OPEN_CONFIG, T(settings_.language, TextId::MenuOpenConfig).c_str());
+    AppendMenuW(menu, MF_STRING, IDM_HELP, T(settings_.language, TextId::MenuHelp).c_str());
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, IDM_EXIT, L"Exit");
+    AppendMenuW(menu, MF_STRING, IDM_EXIT, T(settings_.language, TextId::MenuExit).c_str());
 
     POINT point = {};
     GetCursorPos(&point);
@@ -292,7 +300,7 @@ void AppHost::UpdateTrayTip(const std::wstring& suffix) {
         return;
     }
 
-    std::wstring tip = L"VoidLayer - opacity control";
+    std::wstring tip = T(settings_.language, TextId::TrayTip);
     if (!suffix.empty()) {
         tip += L" - ";
         tip += suffix;
@@ -314,6 +322,14 @@ void AppHost::OpenSettings() {
     resolver_.SetIgnoredWindows(hwnd_, settingsWindow);
 }
 
+void AppHost::ShowHelp() {
+    MessageBoxW(
+        hwnd_,
+        T(settings_.language, TextId::HelpBody).c_str(),
+        T(settings_.language, TextId::HelpTitle).c_str(),
+        MB_OK | MB_ICONINFORMATION);
+}
+
 void AppHost::OnSettingsSaved() {
     settings_ = store_.LoadSettings();
     hotkeys_.Configure(settings_);
@@ -322,10 +338,11 @@ void AppHost::OnSettingsSaved() {
     std::vector<std::wstring> failures;
     hotkeys_.RegisterAll(hwnd_, &failures);
     if (!failures.empty()) {
-        ShowBalloon(L"Hotkey conflict", failures.front(), NIIF_WARNING);
+        ShowBalloon(T(settings_.language, TextId::HotkeyConflictTitle), failures.front(), NIIF_WARNING);
     } else {
-        ShowBalloon(L"VoidLayer", L"Settings saved.");
+        ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::SettingsSaved));
     }
+    UpdateTrayTip();
 }
 
 void AppHost::ToggleReapplyPause() {
@@ -333,12 +350,12 @@ void AppHost::ToggleReapplyPause() {
     if (reapplyPaused_) {
         KillTimer(hwnd_, TIMER_REAPPLY);
         reapply_.Stop();
-        ShowBalloon(L"VoidLayer", L"Strong compatibility paused.");
+        ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::CompatibilityPaused));
     } else {
         reapply_.Start(hwnd_);
         SetTimer(hwnd_, TIMER_REAPPLY, REAPPLY_INTERVAL_MS, nullptr);
         reapply_.ReconcileStickyTargets(true);
-        ShowBalloon(L"VoidLayer", L"Strong compatibility resumed.");
+        ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::CompatibilityResumed));
     }
 }
 
@@ -391,7 +408,7 @@ void AppHost::AdjustForegroundOpacity(int direction) {
         if (result) {
             reapply_.AddOrUpdateSessionTarget(*identity, nextAlpha, true);
             reapply_.UpdatePersistentRuleAlpha(*identity, nextAlpha);
-            UpdateTrayTip(L"current " + PercentTextFromAlpha(nextAlpha));
+            UpdateTrayTip(T(settings_.language, TextId::TrayTipCurrent) + PercentTextFromAlpha(nextAlpha));
         }
     }
 
@@ -415,8 +432,8 @@ void AppHost::RestoreForegroundOpacity() {
         return;
     }
 
-    UpdateTrayTip(L"restored");
-    ShowBalloon(L"VoidLayer", unpinned ? L"Window restored and rule removed." : L"Window restored.");
+    UpdateTrayTip(T(settings_.language, TextId::TrayTipRestored));
+    ShowBalloon(T(settings_.language, TextId::AppTitle), unpinned ? T(settings_.language, TextId::WindowRestoredRuleRemoved) : T(settings_.language, TextId::WindowRestored));
 }
 
 void AppHost::TogglePinForForeground() {
@@ -431,7 +448,7 @@ void AppHost::TogglePinForForeground() {
         reapply_.AddOrUpdateSessionTarget(*identity, alpha, true);
     }
 
-    ShowBalloon(L"VoidLayer", pinned ? L"Pinned opacity rule for this app window." : L"Removed pinned opacity rule.");
+    ShowBalloon(T(settings_.language, TextId::AppTitle), pinned ? T(settings_.language, TextId::RulePinned) : T(settings_.language, TextId::RuleRemoved));
 }
 
 std::optional<WindowIdentity> AppHost::ResolveTargetOrNotify() {
@@ -440,17 +457,19 @@ std::optional<WindowIdentity> AppHost::ResolveTargetOrNotify() {
 
     auto identity = resolver_.ResolveForegroundWindow();
     if (!identity) {
-        ShowBalloon(L"VoidLayer", L"No controllable foreground window found.", NIIF_WARNING);
+        ShowBalloon(T(settings_.language, TextId::AppTitle), T(settings_.language, TextId::NoTargetWindow), NIIF_WARNING);
     }
     return identity;
 }
 
 void AppHost::NotifyApplyFailure(const ApplyResult& result) {
-    std::wstring message = result.message.empty() ? L"Unable to change this window." : result.message;
+    std::wstring message = (settings_.language == AppLanguage::ChineseSimplified || result.message.empty())
+        ? T(settings_.language, TextId::UnableChangeWindow)
+        : result.message;
     if (result.status == ApplyStatus::AccessDenied) {
-        message += L" Try running VoidLayer as administrator.";
+        message += T(settings_.language, TextId::AdminHint);
     }
-    ShowBalloon(L"VoidLayer", message, NIIF_WARNING);
+    ShowBalloon(T(settings_.language, TextId::AppTitle), message, NIIF_WARNING);
 }
 
 }  // namespace voidlayer

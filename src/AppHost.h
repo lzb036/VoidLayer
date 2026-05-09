@@ -50,6 +50,7 @@ private:
     void UpdateTrayTip(const std::wstring& suffix = L"");
 
     void OpenSettings();
+    void ShowHelp();
     void OnSettingsSaved();
     void ToggleReapplyPause();
     void Exit();

@@ -22,6 +22,11 @@ enum class HotkeyAction {
     TogglePin
 };
 
+enum class AppLanguage {
+    English = 0,
+    ChineseSimplified = 1
+};
+
 struct HotkeyConfig {
     UINT modifiers = MOD_ALT | MOD_NOREPEAT;
     UINT key = 0;
@@ -32,6 +37,7 @@ struct AppSettings {
     int opacityStepPercent = 10;
     int minOpacityPercent = 25;
     bool strongCompatibility = true;
+    AppLanguage language = AppLanguage::English;
 
     HotkeyConfig decreaseOpacity{MOD_ALT | MOD_NOREPEAT, VK_LEFT, true};
     HotkeyConfig increaseOpacity{MOD_ALT | MOD_NOREPEAT, VK_RIGHT, true};

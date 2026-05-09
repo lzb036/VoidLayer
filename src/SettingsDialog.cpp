@@ -1,5 +1,7 @@
 #include "SettingsDialog.h"
 
+#include "Localization.h"
+
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <shellapi.h>
@@ -22,6 +24,7 @@ constexpr int IDC_STRONG_CHECK = 4103;
 constexpr int IDC_SAVE = 4104;
 constexpr int IDC_CLOSE = 4105;
 constexpr int IDC_OPEN_CONFIG = 4106;
+constexpr int IDC_LANGUAGE_COMBO = 4107;
 
 COLORREF HexColor(BYTE r, BYTE g, BYTE b) {
     return RGB(r, g, b);
@@ -94,12 +97,12 @@ HWND SettingsDialog::Show() {
     hwnd_ = CreateWindowExW(
         WS_EX_TOOLWINDOW,
         kSettingsClassName,
-        L"VoidLayer Settings",
+        T(settings_.language, TextId::SettingsTitle).c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         500,
-        390,
+        430,
         owner_,
         nullptr,
         instance_,
@@ -161,6 +164,13 @@ LRESULT SettingsDialog::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
+        case IDC_LANGUAGE_COMBO:
+            if (HIWORD(wParam) == CBN_SELCHANGE) {
+                const LRESULT selected = SendMessageW(languageCombo_, CB_GETCURSEL, 0, 0);
+                draft_.language = selected == 1 ? AppLanguage::ChineseSimplified : AppLanguage::English;
+                UpdateLabels();
+            }
+            return 0;
         case IDC_STRONG_CHECK:
             draft_.strongCompatibility = SendMessageW(strongCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
             return 0;
@@ -231,11 +241,11 @@ void SettingsDialog::RegisterClassIfNeeded() {
 }
 
 void SettingsDialog::CreateControls() {
-    HWND title = CreateWindowExW(0, L"STATIC", L"VoidLayer", WS_VISIBLE | WS_CHILD, 24, 20, 180, 26, hwnd_, nullptr, instance_, nullptr);
-    HWND subtitle = CreateWindowExW(
+    titleLabel_ = CreateWindowExW(0, L"STATIC", L"VoidLayer", WS_VISIBLE | WS_CHILD, 24, 20, 180, 26, hwnd_, nullptr, instance_, nullptr);
+    subtitleLabel_ = CreateWindowExW(
         0,
         L"STATIC",
-        L"Lightweight tray opacity control for Windows.",
+        L"",
         WS_VISIBLE | WS_CHILD,
         24,
         48,
@@ -246,14 +256,32 @@ void SettingsDialog::CreateControls() {
         instance_,
         nullptr);
 
-    stepLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 92, 300, 22, hwnd_, nullptr, instance_, nullptr);
-    stepTrack_ = CreateWindowExW(0, TRACKBAR_CLASSW, L"", WS_VISIBLE | WS_CHILD | TBS_AUTOTICKS, 24, 118, 420, 34, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_STEP_TRACK)), instance_, nullptr);
+    languageLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 88, 160, 22, hwnd_, nullptr, instance_, nullptr);
+    languageCombo_ = CreateWindowExW(
+        0,
+        WC_COMBOBOXW,
+        L"",
+        WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
+        190,
+        84,
+        254,
+        110,
+        hwnd_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_LANGUAGE_COMBO)),
+        instance_,
+        nullptr);
+    SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(T(AppLanguage::English, TextId::LanguageEnglish).c_str()));
+    SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(T(AppLanguage::ChineseSimplified, TextId::LanguageChinese).c_str()));
+    SendMessageW(languageCombo_, CB_SETCURSEL, draft_.language == AppLanguage::ChineseSimplified ? 1 : 0, 0);
+
+    stepLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 126, 300, 22, hwnd_, nullptr, instance_, nullptr);
+    stepTrack_ = CreateWindowExW(0, TRACKBAR_CLASSW, L"", WS_VISIBLE | WS_CHILD | TBS_AUTOTICKS, 24, 152, 420, 34, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_STEP_TRACK)), instance_, nullptr);
     SendMessageW(stepTrack_, TBM_SETRANGE, TRUE, MAKELPARAM(1, 50));
     SendMessageW(stepTrack_, TBM_SETPOS, TRUE, draft_.opacityStepPercent);
     SendMessageW(stepTrack_, TBM_SETTICFREQ, 5, 0);
 
-    minLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 166, 360, 22, hwnd_, nullptr, instance_, nullptr);
-    minTrack_ = CreateWindowExW(0, TRACKBAR_CLASSW, L"", WS_VISIBLE | WS_CHILD | TBS_AUTOTICKS, 24, 192, 420, 34, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_MIN_TRACK)), instance_, nullptr);
+    minLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 200, 360, 22, hwnd_, nullptr, instance_, nullptr);
+    minTrack_ = CreateWindowExW(0, TRACKBAR_CLASSW, L"", WS_VISIBLE | WS_CHILD | TBS_AUTOTICKS, 24, 226, 420, 34, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_MIN_TRACK)), instance_, nullptr);
     SendMessageW(minTrack_, TBM_SETRANGE, TRUE, MAKELPARAM(5, 95));
     SendMessageW(minTrack_, TBM_SETPOS, TRUE, draft_.minOpacityPercent);
     SendMessageW(minTrack_, TBM_SETTICFREQ, 10, 0);
@@ -261,10 +289,10 @@ void SettingsDialog::CreateControls() {
     strongCheck_ = CreateWindowExW(
         0,
         L"BUTTON",
-        L"Strong compatibility: reapply opacity every 800 ms and on window events",
+        L"",
         WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
         24,
-        238,
+        272,
         430,
         24,
         hwnd_,
@@ -273,30 +301,33 @@ void SettingsDialog::CreateControls() {
         nullptr);
     SendMessageW(strongCheck_, BM_SETCHECK, draft_.strongCompatibility ? BST_CHECKED : BST_UNCHECKED, 0);
 
-    statusLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 278, 430, 22, hwnd_, nullptr, instance_, nullptr);
+    statusLabel_ = CreateWindowExW(0, L"STATIC", L"", WS_VISIBLE | WS_CHILD, 24, 312, 430, 22, hwnd_, nullptr, instance_, nullptr);
 
-    HWND openButton = CreateWindowExW(0, L"BUTTON", L"Open config", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 24, 318, 112, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_OPEN_CONFIG)), instance_, nullptr);
-    HWND saveButton = CreateWindowExW(0, L"BUTTON", L"Save", WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 276, 318, 80, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_SAVE)), instance_, nullptr);
-    HWND closeButton = CreateWindowExW(0, L"BUTTON", L"Close", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 364, 318, 80, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_CLOSE)), instance_, nullptr);
+    openButton_ = CreateWindowExW(0, L"BUTTON", L"", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 24, 352, 112, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_OPEN_CONFIG)), instance_, nullptr);
+    saveButton_ = CreateWindowExW(0, L"BUTTON", L"", WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 276, 352, 80, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_SAVE)), instance_, nullptr);
+    closeButton_ = CreateWindowExW(0, L"BUTTON", L"", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 364, 352, 80, 30, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_CLOSE)), instance_, nullptr);
 
-    SetControlFont(title, titleFont_);
-    SetControlFont(subtitle, bodyFont_);
+    SetControlFont(titleLabel_, titleFont_);
+    SetControlFont(subtitleLabel_, bodyFont_);
+    SetControlFont(languageLabel_, bodyFont_);
+    SetControlFont(languageCombo_, bodyFont_);
     SetControlFont(stepLabel_, bodyFont_);
     SetControlFont(stepTrack_, bodyFont_);
     SetControlFont(minLabel_, bodyFont_);
     SetControlFont(minTrack_, bodyFont_);
     SetControlFont(strongCheck_, bodyFont_);
     SetControlFont(statusLabel_, bodyFont_);
-    SetControlFont(openButton, bodyFont_);
-    SetControlFont(saveButton, bodyFont_);
-    SetControlFont(closeButton, bodyFont_);
+    SetControlFont(openButton_, bodyFont_);
+    SetControlFont(saveButton_, bodyFont_);
+    SetControlFont(closeButton_, bodyFont_);
 
+    SetExplorerTheme(languageCombo_);
     SetExplorerTheme(stepTrack_);
     SetExplorerTheme(minTrack_);
     SetExplorerTheme(strongCheck_);
-    SetExplorerTheme(openButton);
-    SetExplorerTheme(saveButton);
-    SetExplorerTheme(closeButton);
+    SetExplorerTheme(openButton_);
+    SetExplorerTheme(saveButton_);
+    SetExplorerTheme(closeButton_);
 }
 
 void SettingsDialog::ApplyDarkMode() {
@@ -305,19 +336,45 @@ void SettingsDialog::ApplyDarkMode() {
 }
 
 void SettingsDialog::UpdateLabels() {
+    if (hwnd_ != nullptr) {
+        SetWindowTextW(hwnd_, T(draft_.language, TextId::SettingsTitle).c_str());
+    }
+
+    if (subtitleLabel_ != nullptr) {
+        SetWindowTextW(subtitleLabel_, T(draft_.language, TextId::SettingsSubtitle).c_str());
+    }
+
+    if (languageLabel_ != nullptr) {
+        SetWindowTextW(languageLabel_, T(draft_.language, TextId::LanguageLabel).c_str());
+    }
+
     if (stepLabel_ != nullptr) {
-        const std::wstring text = L"Opacity step: " + std::to_wstring(draft_.opacityStepPercent) + L"%";
+        const std::wstring text = T(draft_.language, TextId::OpacityStepLabel) + std::to_wstring(draft_.opacityStepPercent) + L"%";
         SetWindowTextW(stepLabel_, text.c_str());
     }
 
     if (minLabel_ != nullptr) {
-        const std::wstring text = L"Minimum opacity: " + std::to_wstring(draft_.minOpacityPercent) + L"%";
+        const std::wstring text = T(draft_.language, TextId::MinimumOpacityLabel) + std::to_wstring(draft_.minOpacityPercent) + L"%";
         SetWindowTextW(minLabel_, text.c_str());
     }
 
+    if (strongCheck_ != nullptr) {
+        SetWindowTextW(strongCheck_, T(draft_.language, TextId::StrongCompatibilityLabel).c_str());
+    }
+
     if (statusLabel_ != nullptr) {
-        const std::wstring text = L"Active sticky targets and pinned rules: " + std::to_wstring(activeTargetCount_);
+        const std::wstring text = T(draft_.language, TextId::ActiveTargetsLabel) + std::to_wstring(activeTargetCount_);
         SetWindowTextW(statusLabel_, text.c_str());
+    }
+
+    if (openButton_ != nullptr) {
+        SetWindowTextW(openButton_, T(draft_.language, TextId::OpenConfig).c_str());
+    }
+    if (saveButton_ != nullptr) {
+        SetWindowTextW(saveButton_, T(draft_.language, TextId::Save).c_str());
+    }
+    if (closeButton_ != nullptr) {
+        SetWindowTextW(closeButton_, T(draft_.language, TextId::Close).c_str());
     }
 }
 
@@ -325,6 +382,7 @@ void SettingsDialog::Save() {
     draft_.opacityStepPercent = static_cast<int>(SendMessageW(stepTrack_, TBM_GETPOS, 0, 0));
     draft_.minOpacityPercent = static_cast<int>(SendMessageW(minTrack_, TBM_GETPOS, 0, 0));
     draft_.strongCompatibility = SendMessageW(strongCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    draft_.language = SendMessageW(languageCombo_, CB_GETCURSEL, 0, 0) == 1 ? AppLanguage::ChineseSimplified : AppLanguage::English;
 
     settings_ = draft_;
     store_.SaveSettings(settings_);
